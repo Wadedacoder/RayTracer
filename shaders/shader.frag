@@ -87,7 +87,7 @@ struct hit_record
 
 #define INFINITY 100000.0f
 #define PI 3.1415926535897932385f
-#define NO_SAMPLES 2
+#define NO_SAMPLES 10
 
 Sphere spheres[2];
 
@@ -121,6 +121,10 @@ float random_float(){
 
 float random_float(Interval i){
 	return i.min + (i.max - i.min)*random_float();
+}
+
+vec3 pixel_sample(float u_to_pixel, float v_to_pixel){
+	return vec3((random_float() - 0.5f) * u_to_pixel, (random_float() - 0.5f) * v_to_pixel, 0.0f);
 }
 
 vec3 at(float t, Ray r)
@@ -212,9 +216,13 @@ void main()
 	// FragColor = vec4(tmp,tmp,tmp, 1.0f);
 	vec4 color = vec4(0.0f, 0.0f, 0.0f, 1.0f);
 	for(int i = 0; i < NO_SAMPLES; i++){
+		vec3 tmp = pixel_pos + pixel_sample(u_to_pixel, v_to_pixel);
+		ray_dir = tmp - camera_pos; // Get ray direction
+		r = Ray(camera_pos, normalize(ray_dir));
 		color += color_ray(r);
 	}
 	color /= NO_SAMPLES;
+	color = vec4(clamp(color.x, 0.0f, 1.f), clamp(color.y, 0.0f, 1.f), clamp(color.z, 0.0f, 1.f), 1.0f);
 	FragColor = color;
 	
 	// FragColor = vec4(uv.xyy, 1.0f);
