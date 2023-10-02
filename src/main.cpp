@@ -52,12 +52,38 @@ int main(){
     // Add a shader
     Shader program("./shaders/shader.vert", "./shaders/shader.frag");
 
-    
+    glm::vec3 camera_pos = glm::vec3(0.0f, 0.0f, 0.f);
     
 
     // Main loop
     while (!glfwWindowShouldClose(window))
     {
+        glfwPollEvents();
+                // listen for a ctrl event
+        if (io.KeyCtrl){
+            std::cout << "ctrl pressed" << std::endl;
+            //Close the window
+            glfwSetWindowShouldClose(window, true);
+        }
+        if(io.KeysDown[GLFW_KEY_W]){
+            camera_pos += glm::vec3(0.0f, 0.1f, 0.f);
+        }
+        if(io.KeysDown[GLFW_KEY_S]){
+            camera_pos += glm::vec3(0.0f, -0.1f, -0.f);
+        }
+        if(io.KeysDown[GLFW_KEY_A]){
+            camera_pos += glm::vec3(0.1f, 0.0f, 0.0f);
+        }
+        if(io.KeysDown[GLFW_KEY_D]){
+            camera_pos += glm::vec3(-0.1f, 0.0f, 0.0f);
+        }
+        if(io.KeysDown[GLFW_KEY_Q]){
+            camera_pos += glm::vec3(0.0f, -0.f, 0.1f);
+        }
+        if(io.KeysDown[GLFW_KEY_E]){
+            camera_pos += glm::vec3(0.0f, 0.f, -0.1f);
+        }
+
         // Make a IMGUI FPS counter
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
@@ -69,22 +95,17 @@ int main(){
             ImGui::End();
         }
 
-        glfwPollEvents();
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f );
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        // listen for a ctrl event
-        if (io.KeyCtrl){
-            std::cout << "ctrl pressed" << std::endl;
-            //Close the window
-            glfwSetWindowShouldClose(window, true);
-        }
+
         
         program.use();
         
         program.setFloat("width", (float) width);
         program.setFloat("height", (float) height);
         program.setFloat("focal_length", 1.0f);
-        program.setVec3("camera_pos", glm::vec3(0.0f, 0.0f, 0.0f));
+        program.setFloat("time", glfwGetTime());
+        program.setVec3("camera_pos", camera_pos);
         program.setVec3("camera_dir", glm::vec3(0.0f, 0.0f, -1.0f));
         program.setVec3("camera_up", glm::vec3(0.0f, 1.0f, 0.0f));
 
