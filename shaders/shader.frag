@@ -18,6 +18,14 @@ uniform vec3 camera_pos;
 uniform vec3 camera_dir;
 uniform vec3 camera_up;
 
+float vfov = 90.0f;
+
+// Lighting
+uniform vec3 light_pos;
+uniform vec3 light_color;
+
+// Random number generator
+
 // A single iteration of Bob Jenkins' One-At-A-Time hashing algorithm.
 uint hash( uint x ) {
     x += ( x << 10u );
@@ -87,7 +95,7 @@ struct hit_record
 
 #define INFINITY 100000.0f
 #define PI 3.1415926535897932385f
-#define NO_SAMPLES 10
+#define NO_SAMPLES 1
 
 Sphere spheres[2];
 
@@ -162,9 +170,17 @@ bool hit(Sphere S , Ray r, Interval I ,out hit_record rec){
 	return true;
 }
 
+vec4 shade(vec3 p, vec3 normal){
+	vec3 light_dir = normalize(light_pos - p);
+	float diff = dot(normal, light_dir);
+	vec3 diffuse = light_color * diff;
+	vec4 ambient = vec4(0.1f, 0.1f, 0.1f, 1.0f);
+
+	return ambient + vec4(diffuse, 1.0f);
+}
+
 vec4 color_ray(Ray r){
 	// float t = hit_sphere(vec3(0.0f, 0.0f, -1.0f), 0.5f, r);
-	Sphere S = Sphere(vec3(0.0f, 0.0f, -1.0f), 0.5f);
 	hit_record rec;
 	Interval ray_max = Interval(0.0f, INFINITY);
 	float t_min = 0.0f;
@@ -179,6 +195,7 @@ vec4 color_ray(Ray r){
 	}
 	if(hit_anything){
 		return vec4(0.5f * (rec.normal.x + 1.0f), 0.5f * (rec.normal.y + 1.0f), 0.5f * (rec.normal.z + 1.0f), 1.0f);
+		// return shade(rec.p, rec.normal);
 	}
 	float t = 0.5f *(1.0f + r.dir.y);
 	return vec4(1.0f, 1.0f, 1.0f, 1.0f) * (1.0f - t) + vec4(0.5f, 0.7f, 1.0f, 1.0f) * t;
@@ -189,7 +206,9 @@ vec4 color_ray(Ray r){
 
 void main()
 {	
+	// Calculate seed
 	seed = vec3(gl_FragCoord.xy, 1.0f);
+
 
 	//init two spheres adjacent to each other
 	spheres[0] = Sphere(vec3(0.0f, 0.0f, -1.0f), 0.5f);
@@ -197,17 +216,25 @@ void main()
 
 	// vec3 pixel_pos = llc + gl_FragCoord.x * (viewport_u / width) + gl_FragCoord.y * (viewport_v / height);
 	float aspect_ratio = width / height;
-	float viewport_v = 1.0f;
-	float viewport_u =  viewport_v * aspect_ratio;
-	float u_to_pixel = viewport_u / width;
-	float v_to_pixel = viewport_v / height;
 
-	// Converting fragment coords to camera coords st the camera is at (0, 0, 0) and at the center of the screen
-	vec3 uvw = gl_FragCoord.xyz; // Current pixel position
-	uvw = uvw - camera_pos; // Move camera to origin
-	uvw = uvw - focal_length; // Add focal length
-	uvw = uvw - vec3(width/2, height/2, 0.0f); // Move to center of screen (0, 0, 0
-	vec3 pixel_pos = vec3(uvw.x * u_to_pixel, uvw.y * v_to_pixel, uvw.z); // Scale to viewport
+	// calculate u, v, w for camera
+	vec3 w = normalize(camera_pos - camera_dir);
+	vec3 u = normalize(cross(camera_up, w));
+	vec3 v = cross(w, u);
+
+	// calculate viewport
+	float focal_length = length(camera_pos - camera_dir);
+	float h = tan(radians(vfov) / 2.0f);
+	float viewport_h = 2.0f * focal_length * h;
+	float viewport_w = aspect_ratio * viewport_h;
+
+	// calculate viewport origin
+	vec3 viewport_origin = camera_pos - u * (viewport_w / 2.0f) - v * (viewport_h / 2.0f) - w * focal_length;
+
+	// calculate pixel position
+	float u_to_pixel = viewport_w / width;
+	float v_to_pixel = viewport_h / height;
+	vec3 pixel_pos = viewport_origin + gl_FragCoord.x * u_to_pixel * u + gl_FragCoord.y * v_to_pixel * v; 
 	
 	vec3 ray_dir = pixel_pos - camera_pos; // Get ray direction
 	Ray r = Ray(camera_pos, normalize(ray_dir));
@@ -215,7 +242,21 @@ void main()
 	// float tmp = random(seed);
 	// FragColor = vec4(tmp,tmp,tmp, 1.0f);
 	vec4 color = vec4(0.0f, 0.0f, 0.0f, 1.0f);
-	for(int i = 0; i < NO_SAMPLES; i++){
+	int no_sa = NO_SAMPLES;
+
+	vec4 color1 = vec4(0.0f, 0.0f, 0.0f, 1.0f);
+	vec3 ray = pixel_pos + pixel_sample(u_to_pixel, v_to_pixel) - camera_pos;
+	r = Ray(camera_pos, normalize(ray));
+	color1 += color_ray(r);
+
+	vec4 color2 = vec4(0.0f, 0.0f, 0.0f, 1.0f);
+	ray = pixel_pos + pixel_sample(u_to_pixel, v_to_pixel) - camera_pos;
+	r = Ray(camera_pos, normalize(ray));
+	color2 += color_ray(r);
+	if(color1 == color2){
+		no_sa = 1;
+	}
+	for(int i = 0; i < no_sa; i++){
 		vec3 tmp = pixel_pos + pixel_sample(u_to_pixel, v_to_pixel);
 		ray_dir = tmp - camera_pos; // Get ray direction
 		r = Ray(camera_pos, normalize(ray_dir));

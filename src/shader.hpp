@@ -25,6 +25,7 @@ public:
     void setInt(const std::string& name, int value) const;
     void setFloat(const std::string& name, float value) const;
     void setVec3(const std::string& name, glm::vec3) const;
+    void setVec4(const std::string& name, glm::vec4) const;
 
 private:
     // utility function for checking shader compilation/linking errors.
