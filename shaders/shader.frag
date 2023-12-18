@@ -71,6 +71,22 @@ struct Interval{
 	float max;
 };
 
+struct Material
+{
+	vec3 albedo;
+	float fuzz;
+
+	// Phong
+	float ka;
+	float kd;
+	float ks;
+	float eta;
+
+	vec3 ambient;
+	vec3 diffuse;
+	vec3 specular;
+};
+
 struct Ray
 {
 	vec3 or; // origin
@@ -81,6 +97,7 @@ struct Sphere
 {
 	vec3 center;
 	float radius;
+	Material mat;
 };
 
 struct hit_record
@@ -89,6 +106,7 @@ struct hit_record
 	vec3 normal;
 	float t;
 	bool front_face;
+	Material mat;
 };
 
 // Constants and Globals
@@ -101,6 +119,30 @@ Sphere spheres[2];
 
 Interval empty = Interval(INFINITY, -INFINITY);
 Interval universe = Interval(-INFINITY, INFINITY);
+
+Material groundMat = Material(
+	vec3(0.8f, 0.8f, 0.0f), // albedo
+	0.0f, // fuzz
+	0.1f, // ka
+	0.9f, // kd
+	0.0f, // ks
+	1.0f, // eta
+	vec3(0.1f, 0.4f, 0.1f), // ambient
+	vec3(0.1f, 1.f, 0.1f), // diffuse
+	vec3(0.8f, 0.8f, 0.8f) // specular
+);
+
+Material redMat = Material(
+	vec3(0.8f, 0.0f, 0.0f), // albedo
+	0.0f, // fuzz
+	0.1f, // ka
+	0.9f, // kd
+	0.1f, // ks
+	32.0f, // eta
+	vec3(0.1f, 0.1f, 0.1f), // ambient
+	vec3(0.8f, 0.0f, 0.0f), // diffuse
+	vec3(0.8f, 0.8f, 0.8f) // specular
+);
 
 vec3 seed;
 int random_count = 0;
@@ -167,16 +209,22 @@ bool hit(Sphere S , Ray r, Interval I ,out hit_record rec){
 	rec.p = at(rec.t, r);
 	vec3 outward_normal = (rec.p - center) / radius;
 	rec = set_face_normal(rec, r, outward_normal);
+	rec.mat = S.mat;
 	return true;
 }
 
-vec4 shade(vec3 p, vec3 normal){
+vec4 shade(vec3 p, vec3 normal, Material mat){
 	vec3 light_dir = normalize(light_pos - p);
-	float diff = dot(normal, light_dir);
-	vec3 diffuse = light_color * diff;
-	vec4 ambient = vec4(0.1f, 0.1f, 0.1f, 1.0f);
+	vec3 view_dir = normalize(camera_pos - p);
+	vec3 half_dir = normalize(light_dir + view_dir);
+	float diffuse = max(dot(normal, light_dir), 0.0f);
+	float specular = pow(max(dot(normal, half_dir), 0.0f), mat.eta);
+	vec3 ambient = mat.ambient;
+	vec3 diffuse_color = mat.diffuse * diffuse;
+	vec3 specular_color = mat.specular * specular;
+	vec3 color = ambient + diffuse_color + specular_color;
+	return vec4(color, 1.0f);
 
-	return ambient + vec4(diffuse, 1.0f);
 }
 
 vec4 color_ray(Ray r){
@@ -191,11 +239,12 @@ vec4 color_ray(Ray r){
 			rec = tmp_rec;
 			ray_max.max = rec.t;
 			hit_anything = true;
+			
 		}
 	}
 	if(hit_anything){
-		return vec4(0.5f * (rec.normal.x + 1.0f), 0.5f * (rec.normal.y + 1.0f), 0.5f * (rec.normal.z + 1.0f), 1.0f);
-		// return shade(rec.p, rec.normal);
+		// return vec4(0.5f * (rec.normal.x + 1.0f), 0.5f * (rec.normal.y + 1.0f), 0.5f * (rec.normal.z + 1.0f), 1.0f);
+		return shade(rec.p, rec.normal, rec.mat);
 	}
 	float t = 0.5f *(1.0f + r.dir.y);
 	return vec4(1.0f, 1.0f, 1.0f, 1.0f) * (1.0f - t) + vec4(0.5f, 0.7f, 1.0f, 1.0f) * t;
@@ -211,8 +260,8 @@ void main()
 
 
 	//init two spheres adjacent to each other
-	spheres[0] = Sphere(vec3(0.0f, 0.0f, -1.0f), 0.5f);
-	spheres[1] = Sphere(vec3(0.0f, -100.5f, -1.0f), 100.0f);
+	spheres[0] = Sphere(vec3(0.0f, 0.0f, -1.0f), 0.5f, redMat);
+	spheres[1] = Sphere(vec3(0.0f, -100.5f, -1.0f), 100.0f, groundMat);
 
 	// vec3 pixel_pos = llc + gl_FragCoord.x * (viewport_u / width) + gl_FragCoord.y * (viewport_v / height);
 	float aspect_ratio = width / height;
